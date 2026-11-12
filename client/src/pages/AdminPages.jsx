@@ -1,17 +1,22 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import { toast } from 'sonner';
 import { CATEGORY_ICON_KEYS, CategoryGlyph, resolveIconKey } from '../components/CategoryIcon.jsx';
 import { logoSrc } from '../components/Logo.jsx';
 import { Button, Field, Modal, Notice } from '../components/ui/primitives.jsx';
+import { getAccessToken } from '../services/api.js';
 import { adminApi, catalogApi } from '../services/resources.js';
 import { apiError, dhaka, idOf, lx, media, money } from '../utils/format.js';
 
 const AdminBrandContext = createContext(() => {});
+const AdminLiveContext = createContext({ counts: { total: 0, orders: 0, requests: 0 }, lastNotice: null });
 
 const links = [
   ['/admin', 'overview', true],
+  ['/admin/inbox', 'inbox'],
   ['/admin/products', 'products'],
   ['/admin/categories', 'categories'],
   ['/admin/orders', 'orders'],
@@ -20,18 +25,49 @@ const links = [
   ['/admin/settings', 'settings'],
 ];
 
+function CountBadge({ count }) {
+  if (!count) return null;
+  return <span className="grid h-5 min-w-5 place-items-center rounded-full bg-kelp-700 px-1.5 text-[11px] font-semibold text-white">{count > 99 ? '99+' : count}</span>;
+}
+
 export function AdminLayout() {
   const { t } = useTranslation();
+  const translate = useRef(t);
   const [brand, setBrand] = useState({ logo: null, storeName: 'Farm City' });
+  useEffect(() => {
+    translate.current = t;
+  }, [t]);
+  const [counts, setCounts] = useState({ total: 0, orders: 0, requests: 0 });
+  const [lastNotice, setLastNotice] = useState(null);
   useEffect(() => {
     catalogApi.settings().then((res) => {
       setBrand({ logo: res.data?.logo?.url ? res.data.logo : null, storeName: res.data?.storeName || 'Farm City' });
     }).catch(() => {});
   }, []);
+  useEffect(() => {
+    let active = true;
+    adminApi.noticeSummary().then((res) => { if (active) setCounts(res.data); }).catch(() => {});
+    const socket = io(import.meta.env.VITE_API_URL || undefined, { auth: { token: getAccessToken() || '' } });
+    socket.on('admin:notices', (payload) => {
+      if (payload?.counts) setCounts(payload.counts);
+      if (payload?.notice) {
+        setLastNotice(payload.notice);
+        toast(translate.current(`notice.${payload.notice.type}`, payload.notice.data || {}));
+      }
+    });
+    socket.on('admin:counts', (next) => { if (next?.total != null) setCounts(next); });
+    return () => { active = false; socket.disconnect(); };
+  }, []);
+  function navCount(key) {
+    if (key === 'orders') return counts.orders;
+    if (key === 'settings') return counts.requests;
+    return 0;
+  }
   return (
     <AdminBrandContext.Provider value={setBrand}>
-    <div className="min-h-screen bg-sand/40 lg:grid lg:grid-cols-[220px_1fr]">
-      <aside className="border-b border-ocean-900/10 bg-ocean-950 text-sand lg:min-h-screen lg:border-b-0">
+    <AdminLiveContext.Provider value={{ counts, lastNotice }}>
+    <div className="min-h-screen bg-sand/40 lg:grid lg:grid-cols-[240px_1fr]">
+      <aside className="border-b border-ocean-900/10 bg-ocean-950 text-sand print:hidden lg:min-h-screen lg:border-b-0">
         <div className="flex items-center justify-between gap-2 px-4 py-4">
           <Link to="/admin" className="min-w-0">
             <img src={logoSrc(brand.logo)} alt={brand.storeName || 'Farm City'} className="h-9 w-auto max-w-[6.75rem] object-contain" />
@@ -40,12 +76,24 @@ export function AdminLayout() {
         </div>
         <nav className="flex gap-1 overflow-x-auto px-2 pb-3 lg:block lg:space-y-1 lg:px-3">
           {links.map(([to, key, end]) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => `block whitespace-nowrap rounded-xl px-3 py-2 text-sm ${isActive ? 'bg-white text-ocean-950' : 'text-sand/80 hover:bg-white/10'}`}>{t(`admin.${key}`)}</NavLink>
+            <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm ${isActive ? 'bg-white text-ocean-950' : 'text-sand/80 hover:bg-white/10'}`}>
+              <span className="flex-1">{t(`admin.${key}`)}</span>
+              <CountBadge count={navCount(key)} />
+            </NavLink>
           ))}
         </nav>
       </aside>
-      <div className="p-4 sm:p-6"><Outlet /></div>
+      <div>
+        <div className="flex items-center justify-end px-4 pt-4 print:hidden sm:px-6">
+          <Link to="/admin/inbox" className="relative rounded-full bg-white p-2.5 text-ocean-950 shadow-soft" aria-label={t('admin.inbox')}>
+            <Bell className="h-[18px] w-[18px]" />
+            {counts.total > 0 ? <span className="absolute -right-1 -top-1"><CountBadge count={counts.total} /></span> : null}
+          </Link>
+        </div>
+        <div className="p-4 sm:p-6"><Outlet /></div>
+      </div>
     </div>
+    </AdminLiveContext.Provider>
     </AdminBrandContext.Provider>
   );
 }
@@ -393,11 +441,12 @@ const NEXT = { Pending: ['Confirmed', 'Cancelled'], Confirmed: ['Processing', 'C
 
 export function OrdersAdminPage() {
   const { t } = useTranslation();
+  const { lastNotice } = useContext(AdminLiveContext);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [rows, setRows] = useState([]);
   function load() { adminApi.orders({ q, status, limit: 30 }).then((res) => setRows(res.data)); }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [lastNotice?.id]);
   return (
     <div>
       <h1 className="font-display text-4xl">{t('admin.orders')}</h1>
@@ -407,7 +456,7 @@ export function OrdersAdminPage() {
         <Button type="submit" variant="outline">{t('common.search')}</Button>
       </form>
       <div className="mt-4 overflow-x-auto rounded-3xl bg-white">
-        {rows.map((order) => <Link key={order._id} to={`/admin/orders/${order._id}`} className="flex items-center justify-between border-b border-ocean-900/10 px-4 py-3 text-sm"><span>{order.orderNumber}<span className="block text-xs text-ocean-900/50">{order.customer?.name} · {order.customer?.phone}</span></span><span>{t(`status.${order.status}`)} · {money(order.total)}</span></Link>)}
+        {rows.map((order) => <Link key={order._id} to={`/admin/orders/${order._id}`} className="flex items-center justify-between border-b border-ocean-900/10 px-4 py-3 text-sm"><span className="flex items-center gap-2">{order.unseen ? <span className="h-2 w-2 rounded-full bg-kelp-700" aria-hidden /> : null}<span>{order.orderNumber}<span className="block text-xs text-ocean-900/50">{order.customer?.name} · {order.customer?.phone}</span></span></span><span>{t(`status.${order.status}`)} · {money(order.total)}</span></Link>)}
       </div>
     </div>
   );
@@ -419,7 +468,10 @@ export function OrderAdminPage() {
   const [order, setOrder] = useState(null);
   const [status, setStatus] = useState('');
   const [note, setNote] = useState('');
-  useEffect(() => { adminApi.order(id).then((res) => { setOrder(res.data); setStatus((NEXT[res.data.status] || [])[0] || ''); }); }, [id]);
+  useEffect(() => {
+    adminApi.order(id).then((res) => { setOrder(res.data); setStatus((NEXT[res.data.status] || [])[0] || ''); });
+    adminApi.seeNotices({ refType: 'Order', refId: id }).catch(() => {});
+  }, [id]);
   async function update(event) {
     event.preventDefault();
     try {
@@ -436,7 +488,13 @@ export function OrderAdminPage() {
       <p>{order.customer?.name} · {order.customer?.phone} · {order.customer?.email}</p>
       <p className="text-sm">{order.shippingAddress?.addressLine}, {order.shippingAddress?.area} {order.shippingAddress?.district}</p>
       {order.items.map((item) => <p key={item._id} className="text-sm">{lx(item.name, i18n.language)} · {item.variantLabel} × {item.quantity} · {money(item.lineTotal)} <span className="text-ocean-900/50">@ {money(item.unitPrice)}</span></p>)}
-      <p className="font-medium">Total {money(order.total)} · {t(`pay.${order.paymentMethod}`)} · {order.paymentStatus}</p>
+      <p className="font-medium">Total {money(order.total)} · {t(`pay.${order.paymentMethod}`)} · {t(`payStatus.${order.paymentStatus}`)}</p>
+      {order.invoice ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span>{t('invoice.number')}: {order.invoice.invoiceNumber}</span>
+          <Button asChild variant="outline"><Link to={`/admin/orders/${order._id}/invoice`}>{t('invoice.view')}</Link></Button>
+        </div>
+      ) : null}
       <ol className="space-y-2 text-sm">{order.statusHistory.map((entry, index) => <li key={index}>{t(`status.${entry.status}`)} · {dhaka(entry.at, i18n.language)} {entry.note}</li>)}</ol>
       {(NEXT[order.status] || []).length ? (
         <form onSubmit={update} className="flex flex-wrap gap-2">
@@ -522,6 +580,7 @@ export function PromotionsPage() {
 export function SettingsAdminPage() {
   const { t, i18n } = useTranslation();
   const setBrand = useContext(AdminBrandContext);
+  const { lastNotice } = useContext(AdminLiveContext);
   const [settings, setSettings] = useState(null);
   const [providers, setProviders] = useState([]);
   const [zones, setZones] = useState([]);
@@ -531,8 +590,20 @@ export function SettingsAdminPage() {
     adminApi.settings().then((res) => setSettings(res.data));
     adminApi.providers().then((res) => setProviders(res.data));
     adminApi.zones().then((res) => setZones(res.data));
-    adminApi.inquiries().then((res) => setInquiries(res.data));
+    adminApi.inquiries().then((res) => {
+      setInquiries(res.data || []);
+      const ids = (res.data || []).map((item) => item._id).filter(Boolean);
+      if (ids.length) adminApi.seeNotices({ refType: 'Inquiry', refIds: ids }).catch(() => {});
+    });
   }, []);
+  useEffect(() => {
+    if (lastNotice?.type !== 'inquiry.new') return;
+    adminApi.inquiries().then((res) => {
+      setInquiries(res.data || []);
+      const ids = (res.data || []).map((item) => item._id).filter(Boolean);
+      if (ids.length) adminApi.seeNotices({ refType: 'Inquiry', refIds: ids }).catch(() => {});
+    }).catch(() => {});
+  }, [lastNotice?.id, lastNotice?.type]);
   if (!settings) return null;
   async function uploadLogo(event) {
     const file = event.target.files?.[0];
@@ -604,10 +675,47 @@ export function SettingsAdminPage() {
           {zones.map((item) => <div key={item._id} className="flex justify-between border-b px-3 py-2 text-sm"><span>{item.district} {item.area} · {money(item.charge)} · {lx(item.eta, i18n.language)}</span><button type="button" className="text-red-700" onClick={async () => { await adminApi.deleteZone(item._id); setZones((await adminApi.zones()).data); }}>{t('common.delete')}</button></div>)}
         </div>
       </section>
-      <section>
+      <section id="inquiries">
         <h2 className="font-display text-2xl">{t('admin.inquiries')}</h2>
         {inquiries.map((item) => <p key={item._id} className="mt-2 text-sm"><strong>{item.name}</strong> — {item.message}</p>)}
       </section>
+    </div>
+  );
+}
+
+export function InboxPage() {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { lastNotice } = useContext(AdminLiveContext);
+  const [rows, setRows] = useState([]);
+  useEffect(() => {
+    adminApi.notices().then((res) => setRows(res.data || [])).catch((error) => toast.error(apiError(error)));
+  }, [lastNotice?.id]);
+  async function open(notice) {
+    try {
+      if (!notice.seenAt) await adminApi.seeNotices({ ids: [notice.id] });
+      if (notice.href) navigate(notice.href);
+    } catch (error) { toast.error(apiError(error)); }
+  }
+  return (
+    <div>
+      <h1 className="font-display text-4xl">{t('admin.inbox')}</h1>
+      {rows.length === 0 ? <p className="mt-4 text-ocean-900/70">{t('admin.noNotices')}</p> : (
+        <ul className="mt-4 divide-y divide-ocean-900/10 rounded-3xl bg-white">
+          {rows.map((notice) => (
+            <li key={notice.id}>
+              <button type="button" className="flex w-full items-start gap-3 px-4 py-3 text-left" onClick={() => open(notice)}>
+                <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${notice.seenAt ? 'bg-transparent' : 'bg-kelp-700'}`} />
+                <span className="min-w-0">
+                  <span className={`block text-sm ${notice.seenAt ? '' : 'font-medium'}`}>{t(`notice.${notice.type}`, notice.data || {})}</span>
+                  <span className="block text-xs text-ocean-900/55">{notice.data?.message || [notice.data?.customerName, notice.data?.phone, notice.data?.total != null ? money(notice.data.total) : ''].filter(Boolean).join(' · ')}</span>
+                  <span className="text-xs text-ocean-900/45">{dhaka(notice.createdAt, i18n.language)}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -44,6 +44,12 @@ export const orderApi = {
   byToken: (orderNumber, token) => get(`/api/orders/${orderNumber}`, { params: { token } }),
   track: (body) => post('/api/orders/track', body),
   cancel: (orderNumber, note) => post(`/api/orders/${orderNumber}/cancel`, { note }),
+  invoice: (orderNumber) => get(`/api/orders/mine/${orderNumber}/invoice`),
+};
+
+export const notificationApi = {
+  list: () => get('/api/notifications', { params: { limit: 40 } }),
+  read: (body) => post('/api/notifications/read', body),
 };
 
 export const adminApi = {
@@ -57,7 +63,11 @@ export const adminApi = {
   deleteCategory: (id) => del(`/api/categories/${id}`),
   orders: (params) => get('/api/admin/orders', { params }),
   order: (id) => get(`/api/admin/orders/${id}`),
+  invoice: (id) => get(`/api/admin/orders/${id}/invoice`),
   status: (id, body) => patch(`/api/admin/orders/${id}/status`, body),
+  noticeSummary: () => get('/api/admin/notices/summary'),
+  notices: () => get('/api/admin/notices'),
+  seeNotices: (body) => post('/api/admin/notices/seen', body),
   customers: (params) => get('/api/admin/customers', { params }),
   customer: (id) => get(`/api/admin/customers/${id}`),
   customerStatus: (id, isActive) => patch(`/api/admin/customers/${id}`, { isActive }),

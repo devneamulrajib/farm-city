@@ -14,6 +14,8 @@ import { getSettings, publicSettings } from '../services/settingsService.js';
 import { storeImage } from '../services/imageService.js';
 import { updateOrderStatus } from '../services/orderService.js';
 import { computeAvailability } from '../services/catalogService.js';
+import { ensureInvoiceNotified, readInvoiceSummary, summarizeInvoice } from '../services/invoiceService.js';
+import { unseenOrderIds } from '../services/notificationService.js';
 
 export const overview = asyncHandler(async (req, res) => {
   const settings = await getSettings();
@@ -86,13 +88,22 @@ export const adminOrders = asyncHandler(async (req, res) => {
     Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Order.countDocuments(filter),
   ]);
-  ok(res, items, { page, limit, total, pages: Math.ceil(total / limit) });
+  const unseen = await unseenOrderIds(items.map((order) => order._id));
+  const data = items.map((order) => {
+    const obj = order.toObject();
+    obj.unseen = unseen.has(String(order._id));
+    return obj;
+  });
+  ok(res, data, { page, limit, total, pages: Math.ceil(total / limit) });
 });
 
 export const adminOrder = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id).populate('user', 'name email phone isActive');
   if (!order) throw new ApiError(404, 'Order not found.');
-  ok(res, order);
+  const { invoice } = await ensureInvoiceNotified(order);
+  const data = order.toObject();
+  data.invoice = summarizeInvoice(invoice);
+  ok(res, data);
 });
 
 export const patchOrderStatus = asyncHandler(async (req, res) => {
@@ -102,7 +113,9 @@ export const patchOrderStatus = asyncHandler(async (req, res) => {
     note: req.validated.body.note,
     actor: req.user,
   });
-  ok(res, order);
+  const data = order.toObject();
+  data.invoice = await readInvoiceSummary(order);
+  ok(res, data);
 });
 
 export const customers = asyncHandler(async (req, res) => {

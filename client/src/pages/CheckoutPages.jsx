@@ -200,7 +200,7 @@ export function CheckoutPage() {
   );
 }
 
-export function OrderView({ order, onCancel }) {
+export function OrderView({ order, onCancel, invoiceHref }) {
   const { t, i18n } = useTranslation();
   if (!order) return null;
   return (
@@ -231,6 +231,7 @@ export function OrderView({ order, onCancel }) {
         <p className="mt-1 flex justify-between font-medium"><span>Total</span><span>{money(order.total)}</span></p>
       </div>
       <p className="text-sm text-ocean-900/70">{order.shippingAddress?.addressLine}, {order.shippingAddress?.area} {order.shippingAddress?.district}</p>
+      {invoiceHref && order.invoice ? <Button asChild variant="outline"><Link to={invoiceHref}>{t('invoice.view')}</Link></Button> : null}
       {onCancel && order.status === 'Pending' ? <Button variant="outline" onClick={onCancel}>{t('order.cancel')}</Button> : null}
       <p className="text-xs text-ocean-900/50">{t('order.live')}</p>
     </div>
@@ -242,6 +243,7 @@ export function ConfirmationPage() {
   const [params] = useSearchParams();
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
   const [order, setOrder] = useState(null);
   const [error, setError] = useState('');
   const token = params.get('token');
@@ -263,7 +265,7 @@ export function ConfirmationPage() {
       {payment === 'success' ? <Notice tone="ok">{t('order.paid')}</Notice> : null}
       {payment === 'failed' ? <Notice>{t('order.failed')}</Notice> : null}
       {payment === 'cancel' ? <Notice>{t('order.cancelPay')}</Notice> : null}
-      {error ? <Notice>{error}</Notice> : order ? <div className="mt-6"><OrderView order={order} /></div> : <Spinner />}
+      {error ? <Notice>{error}</Notice> : order ? <div className="mt-6"><OrderView order={order} invoiceHref={user && order.invoice ? `/account/orders/${order.orderNumber}/invoice` : ''} /></div> : <Spinner />}
     </div>
   );
 }

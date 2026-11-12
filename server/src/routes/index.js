@@ -11,6 +11,8 @@ import * as orders from '../controllers/orderController.js';
 import * as payments from '../controllers/paymentController.js';
 import * as admin from '../controllers/adminController.js';
 import * as content from '../controllers/contentController.js';
+import * as invoices from '../controllers/invoiceController.js';
+import * as notifications from '../controllers/notificationController.js';
 import {
   addressSchema,
   addressUpdateSchema,
@@ -88,6 +90,9 @@ router.post('/orders', optionalAuth, validate(checkoutSchema), orders.postOrder)
 router.get('/orders', requireAuth, orders.myOrders);
 router.post('/orders/track', validate(trackSchema), orders.track);
 router.get('/orders/mine/:orderNumber', requireAuth, orders.myOrder);
+router.get('/orders/mine/:orderNumber/invoice', requireAuth, invoices.myInvoice);
+router.get('/notifications', requireAuth, notifications.myNotifications);
+router.post('/notifications/read', requireAuth, notifications.readNotifications);
 router.get('/orders/:orderNumber', orders.publicOrder);
 router.post('/orders/:orderNumber/cancel', requireAuth, validate(cancelSchema), orders.cancel);
 
@@ -119,7 +124,11 @@ router.get('/admin/products', ...guard, catalog.adminProducts);
 router.get('/admin/products/:id', ...guard, catalog.adminProduct);
 router.get('/admin/categories', ...guard, catalog.adminCategories);
 router.get('/admin/banners', ...guard, catalog.adminBanners);
+router.get('/admin/notices/summary', ...guard, notifications.adminNoticeSummary);
+router.get('/admin/notices', ...guard, notifications.adminNotices);
+router.post('/admin/notices/seen', ...guard, notifications.seeAdminNotices);
 router.get('/admin/orders', ...guard, admin.adminOrders);
+router.get('/admin/orders/:id/invoice', ...guard, invoices.adminInvoice);
 router.get('/admin/orders/:id', ...guard, admin.adminOrder);
 router.patch('/admin/orders/:id/status', ...guard, validate(statusSchema), admin.patchOrderStatus);
 router.get('/admin/customers', ...guard, admin.customers);

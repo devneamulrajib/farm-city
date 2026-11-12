@@ -17,14 +17,40 @@ import { refreshAvailability } from './catalogService.js';
 import { getProvider, listPublicMethods } from './payment/registry.js';
 import { getSettings } from './settingsService.js';
 import { env } from '../config/env.js';
+import {
+  INVOICE_STATUSES,
+  ensureInvoice,
+  ensureInvoiceNotified,
+  readInvoiceSummary,
+  summarizeInvoice,
+  summariesForOrders,
+} from './invoiceService.js';
+import {
+  claimGuestNotifications,
+  notifyInvoiceReady,
+  onOrderCancelled,
+  onOrderPlaced,
+  onOrderProgress,
+  onPaymentFailed,
+  ownerId,
+} from './notificationService.js';
 
 let ioRef = null;
 export function setOrderIo(io) {
   ioRef = io;
 }
 
-function emitStatus(order) {
-  if (!ioRef) return;
+async function signal(fn) {
+  try {
+    await fn();
+  } catch (error) {
+    console.error('Notification failed:', error?.message || error);
+  }
+}
+
+async function emitStatus(order) {
+  if (!ioRef || !order) return;
+  const invoice = await readInvoiceSummary(order);
   const payload = {
     orderId: String(order._id),
     orderNumber: order.orderNumber,
@@ -32,8 +58,10 @@ function emitStatus(order) {
     paymentStatus: order.paymentStatus,
     statusHistory: order.statusHistory,
   };
+  if (invoice) payload.invoice = invoice;
   ioRef.to(`order:${order._id}`).emit('order:status', payload);
-  if (order.user) ioRef.to(`user:${order.user}`).emit('order:status', payload);
+  const userId = ownerId(order);
+  if (userId) ioRef.to(`user:${userId}`).emit('order:status', payload);
 }
 
 export function presentOrder(order, { includeToken = false } = {}) {
@@ -241,10 +269,12 @@ export async function checkout({ user, guestId, input }) {
       payment.status = 'failed';
       payment.failureReason = error.message;
       await payment.save();
+      await signal(() => onPaymentFailed(order));
       throw new ApiError(502, 'The payment provider could not start the payment. The order was cancelled and you were not charged.');
     }
   }
 
+  await signal(() => onOrderPlaced(order));
   return {
     order: presentOrder(order, { includeToken: true }),
     payment: {
@@ -289,8 +319,9 @@ export async function finalizeOnlinePayment({ providerId, payload }) {
       order.cancelReason = payment.failureReason;
       order.statusHistory.push({ status: 'Cancelled', note: payment.failureReason, at: new Date() });
       await order.save();
-      emitStatus(order);
     }
+    await emitStatus(order);
+    await signal(() => onPaymentFailed(order));
     return order;
   }
 
@@ -325,8 +356,18 @@ export async function finalizeOnlinePayment({ providerId, payload }) {
   } finally {
     session.endSession();
   }
+  const beforeStatus = order.status;
   const updated = await Order.findById(order._id);
-  emitStatus(updated);
+  let invoiceResult = { invoice: null, created: false };
+  if (updated && INVOICE_STATUSES.includes(updated.status)) {
+    invoiceResult = await ensureInvoice(updated);
+  }
+  await emitStatus(updated);
+  if (updated && updated.status !== beforeStatus && updated.status !== 'Cancelled') {
+    await signal(() => onOrderProgress(updated, invoiceResult));
+  } else if (invoiceResult.created) {
+    await signal(() => notifyInvoiceReady(updated, invoiceResult.invoice));
+  }
   return updated;
 }
 
@@ -352,11 +393,13 @@ async function releaseOrder(order, { by, note }, session) {
 export async function cancelOrder({ orderNumber, user, note }) {
   const session = await mongoose.startSession();
   let order;
+  let refunded = false;
   try {
     await session.withTransaction(async () => {
       order = await Order.findOne({ orderNumber, user: user._id }).session(session);
       if (!order) throw new ApiError(404, 'Order not found.');
       if (order.status !== 'Pending') throw new ApiError(400, 'Only pending orders can be cancelled here.');
+      refunded = order.paymentStatus === 'paid';
       await releaseOrder(order, { by: user._id, note: note || 'Cancelled by customer' }, session);
       await order.save({ session });
     });
@@ -364,21 +407,26 @@ export async function cancelOrder({ orderNumber, user, note }) {
     session.endSession();
   }
   const fresh = await Order.findById(order._id);
-  emitStatus(fresh);
-  return presentOrder(fresh);
+  await emitStatus(fresh);
+  await signal(() => onOrderCancelled(fresh, { refunded, notifyAdmin: true }));
+  return { ...presentOrder(fresh), invoice: await readInvoiceSummary(fresh) };
 }
 
 export async function updateOrderStatus({ id, status, note, actor }) {
   if (!STATUS_TRANSITIONS[status] && status !== 'Cancelled') throw new ApiError(400, 'Unknown status.');
   const session = await mongoose.startSession();
   let order;
+  let previous = null;
+  let refunded = false;
   try {
     await session.withTransaction(async () => {
       order = await Order.findById(id).session(session);
       if (!order) throw new ApiError(404, 'Order not found.');
+      previous = order.status;
       const allowed = STATUS_TRANSITIONS[order.status] || [];
       if (!allowed.includes(status)) throw new ApiError(400, `Cannot move an order from ${order.status} to ${status}.`);
       if (status === 'Cancelled') {
+        refunded = order.paymentStatus === 'paid';
         await releaseOrder(order, { by: actor?._id, note: note || 'Cancelled by the shop' }, session);
       } else {
         order.status = status;
@@ -394,7 +442,19 @@ export async function updateOrderStatus({ id, status, note, actor }) {
     session.endSession();
   }
   const fresh = await Order.findById(id).populate('user', 'name email phone');
-  emitStatus(fresh);
+  let invoiceResult = { invoice: null, created: false };
+  if (INVOICE_STATUSES.includes(fresh.status)) {
+    invoiceResult = await ensureInvoice(fresh);
+  }
+  await emitStatus(fresh);
+  const notifyAdmin = actor?.role !== 'admin';
+  if (fresh.status === 'Cancelled') {
+    await signal(() => onOrderCancelled(fresh, { refunded, notifyAdmin }));
+  } else if (fresh.status !== previous) {
+    await signal(() => onOrderProgress(fresh, invoiceResult));
+  } else if (invoiceResult.created) {
+    await signal(() => notifyInvoiceReady(fresh, invoiceResult.invoice));
+  }
   return fresh;
 }
 
@@ -405,19 +465,27 @@ export async function listMyOrders(user, query) {
     Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Order.countDocuments(filter),
   ]);
-  return { items: items.map((order) => presentOrder(order)), meta: { page, limit, total, pages: Math.ceil(total / limit) } };
+  const invoices = await summariesForOrders(items);
+  return {
+    items: items.map((order) => ({
+      ...presentOrder(order),
+      invoice: invoices.get(String(order._id)) || null,
+    })),
+    meta: { page, limit, total, pages: Math.ceil(total / limit) },
+  };
 }
 
 export async function getOwnedOrder(user, orderNumber) {
   const order = await Order.findOne({ orderNumber, user: user._id });
   if (!order) throw new ApiError(404, 'Order not found.');
-  return presentOrder(order);
+  const { invoice } = await ensureInvoiceNotified(order);
+  return { ...presentOrder(order), invoice: summarizeInvoice(invoice) };
 }
 
 export async function getOrderByToken(orderNumber, token) {
   const order = await Order.findOne({ orderNumber, viewToken: token });
   if (!order) throw new ApiError(404, 'Order not found.');
-  return presentOrder(order);
+  return { ...presentOrder(order), invoice: await readInvoiceSummary(order) };
 }
 
 export async function trackOrder({ orderNumber, phone }) {
@@ -425,10 +493,11 @@ export async function trackOrder({ orderNumber, phone }) {
   if (!normalized) throw new ApiError(400, 'Enter a valid Bangladeshi mobile number.');
   const order = await Order.findOne({ orderNumber, 'customer.phone': normalized });
   if (!order) throw new ApiError(404, 'No order matches that number and phone.');
-  return presentOrder(order);
+  return { ...presentOrder(order), invoice: await readInvoiceSummary(order) };
 }
 
 export async function claimGuestOrders(user) {
   if (!user?.phone) return;
   await Order.updateMany({ user: null, 'customer.phone': user.phone }, { $set: { user: user._id } });
+  await claimGuestNotifications(user);
 }

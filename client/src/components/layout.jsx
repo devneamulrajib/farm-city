@@ -9,6 +9,7 @@ import { fetchCart, removeFromCart, updateCartQty } from '../store/cartSlice.js'
 import { setLocale, setMiniCart, setMobileNav } from '../store/uiSlice.js';
 import { lx, media, money, roundQty } from '../utils/format.js';
 import { CategoryIcon } from './CategoryIcon.jsx';
+import { LiveNotificationsProvider, NotificationBell } from './LiveNotifications.jsx';
 import { Logo, logoSrc } from './Logo.jsx';
 import { Badge, Button, Menu as AccountMenu, MenuItem, Sheet } from './ui/primitives.jsx';
 
@@ -66,7 +67,7 @@ export function Header({ categories = [], settings = null }) {
   }
 
   return (
-    <div className={`sticky top-0 z-40 transition-shadow ${compact ? 'shadow-soft' : ''}`}>
+    <div className={`sticky top-0 z-40 transition-shadow print:hidden ${compact ? 'shadow-soft' : ''}`}>
       <Announcement settings={settings} compact={compact} />
       <header className="border-b border-ocean-950/5 bg-white/85 backdrop-blur-md">
         <div className={`container-page flex items-center gap-4 transition-all ${compact ? 'h-16' : 'h-[4.75rem]'}`}>
@@ -85,12 +86,14 @@ export function Header({ categories = [], settings = null }) {
             <button type="button" className="rounded-full px-3 py-2 text-xs font-medium tracking-[0.14em] hover:bg-[#f6f3ee]" onClick={switchLang} aria-label={t('common.language')}>
               <Globe className="mr-1 inline h-4 w-4" />{i18n.language === 'bn' ? 'EN' : 'বাং'}
             </button>
+            {user ? <NotificationBell /> : null}
             <AccountMenu trigger={<button type="button" className="rounded-full p-2.5 hover:bg-[#f6f3ee]" aria-label={t('common.account')}><User className="h-[18px] w-[18px]" /></button>}>
               {user ? (
                 <>
                   <div className="px-3 py-2 text-xs text-ocean-900/60">{user.name}</div>
                   <MenuItem onSelect={() => navigate('/account')}>{t('nav.profile')}</MenuItem>
                   <MenuItem onSelect={() => navigate('/account/orders')}>{t('nav.orders')}</MenuItem>
+                  <MenuItem onSelect={() => navigate('/account/notifications')}>{t('nav.notifications')}</MenuItem>
                   <MenuItem onSelect={() => navigate('/account/addresses')}>{t('nav.addresses')}</MenuItem>
                   {user.role === 'admin' ? <MenuItem onSelect={() => navigate('/admin')}>{t('nav.admin')}</MenuItem> : null}
                   <MenuItem onSelect={() => dispatch(logout()).then(() => dispatch(fetchCart()))}>{t('nav.logout')}</MenuItem>
@@ -157,6 +160,7 @@ export function Header({ categories = [], settings = null }) {
           ))}
           <div className="mt-4 border-t border-ocean-950/10 pt-3">
             <Link className="block rounded-2xl px-4 py-3 hover:bg-[#f6f3ee]" to="/track" onClick={() => dispatch(setMobileNav(false))}>{t('nav.track')}</Link>
+            {user ? <Link className="block rounded-2xl px-4 py-3 hover:bg-[#f6f3ee]" to="/account/notifications" onClick={() => dispatch(setMobileNav(false))}>{t('nav.notifications')}</Link> : null}
             <Link className="block rounded-2xl px-4 py-3 hover:bg-[#f6f3ee]" to={user ? '/account' : '/login'} onClick={() => dispatch(setMobileNav(false))}>{user ? t('nav.profile') : t('nav.login')}</Link>
           </div>
         </div>
@@ -204,7 +208,7 @@ export function CartLines({ cart }) {
 export function Footer({ settings, categories }) {
   const { t, i18n } = useTranslation();
   return (
-    <footer className="mt-8 bg-ocean-950 text-sand">
+    <footer className="mt-8 bg-ocean-950 text-sand print:hidden">
       <div className="container-page grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-4">
         <div className="lg:col-span-1">
           <img src={logoSrc(settings?.logo)} alt="" className="h-12 w-auto max-w-[13rem] object-contain" />
@@ -256,12 +260,14 @@ export function StoreLayout() {
     if (status === 'ready') dispatch(fetchCart());
   }, [status, dispatch]);
   return (
+    <LiveNotificationsProvider>
     <div className="flex min-h-screen flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-white focus:px-4 focus:py-2">{useTranslation().t('skip')}</a>
       <Header categories={categories} settings={settings} />
       <main id="main" className="flex-1"><Outlet context={{ categories, settings }} /></main>
       <Footer settings={settings} categories={categories} />
     </div>
+    </LiveNotificationsProvider>
   );
 }
 
