@@ -22,7 +22,7 @@ export function Logo({ compact = false, logo = null }) {
           <span className="text-ocean-950">Farm</span>
           <span className="text-kelp-700"> City</span>
         </span>
-        <span className="mt-1 hidden text-[10px] uppercase tracking-[0.24em] text-ocean-700 sm:block">Trikon · Dhaka</span>
+        <span className="mt-1 hidden text-[10px] uppercase tracking-[0.24em] text-ocean-700 sm:block">Bangladesh</span>
       </span>
     </Link>
   );
