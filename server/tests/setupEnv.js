@@ -1,0 +1,9 @@
+process.env.NODE_ENV = 'test';
+process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/farmcity_test?replicaSet=rs0';
+process.env.JWT_ACCESS_SECRET = 'test-access-secret';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+process.env.CLIENT_ORIGIN = 'http://127.0.0.1:4178';
+process.env.SERVER_URL = 'http://127.0.0.1:4108';
+process.env.BCRYPT_COST = '4';
+process.env.COOKIE_SECURE = 'false';
+process.env.COOKIE_SAMESITE = 'lax';
