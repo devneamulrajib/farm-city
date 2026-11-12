@@ -3,6 +3,7 @@ import { app } from './app.js';
 import { connectDb } from './config/db.js';
 import { assertProductionSecrets, env } from './config/env.js';
 import { attachSocket } from './socket/index.js';
+import { backfillInvoices } from './services/invoiceService.js';
 
 assertProductionSecrets();
 const server = http.createServer(app);
@@ -18,6 +19,14 @@ if (typeof globalThis.PhusionPassenger !== 'undefined') {
   });
 }
 
-connectDb().catch((err) => {
-  console.error('Database connection failed:', err?.name || 'Error');
-});
+connectDb()
+  .then(async () => {
+    try {
+      await backfillInvoices();
+    } catch (error) {
+      console.error('Invoice backfill failed:', error?.message || error);
+    }
+  })
+  .catch((err) => {
+    console.error('Database connection failed:', err?.name || 'Error');
+  });

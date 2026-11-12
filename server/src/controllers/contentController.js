@@ -3,6 +3,7 @@ import { Subscriber } from '../models/Subscriber.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok } from '../utils/respond.js';
 import { listActiveZones, quoteDelivery } from '../services/deliveryService.js';
+import { notifyInquiry } from '../services/notificationService.js';
 
 export const subscribe = asyncHandler(async (req, res) => {
   const email = req.validated.body.email.toLowerCase();
@@ -18,6 +19,11 @@ export const subscribe = asyncHandler(async (req, res) => {
 
 export const createInquiry = asyncHandler(async (req, res) => {
   const inquiry = await Inquiry.create(req.validated.body);
+  try {
+    await notifyInquiry(inquiry);
+  } catch (error) {
+    console.error('Inquiry notification failed:', error?.message || error);
+  }
   ok(res, { id: inquiry._id }, null, 201);
 });
 

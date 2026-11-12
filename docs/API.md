@@ -84,6 +84,7 @@ Prices are calculated from the current catalog. Lines that are out of stock come
 | POST | `/orders` | guest or user |
 | GET | `/orders` | user, own orders |
 | GET | `/orders/mine/:orderNumber` | user |
+| GET | `/orders/mine/:orderNumber/invoice` | user, once the order is confirmed or further along |
 | GET | `/orders/:orderNumber?token=` | view token from checkout |
 | POST | `/orders/track` | `{ orderNumber, phone }` |
 | POST | `/orders/:orderNumber/cancel` | user, only while `Pending` |
@@ -95,6 +96,25 @@ Each order item snapshots name (English and Bangla), image, sku, variant label, 
 Statuses: `Pending`, `Confirmed`, `Processing`, `Out for Delivery`, `Delivered`, `Cancelled`. Every change appends `statusHistory`.
 
 Cash on delivery decrements stock immediately and leaves payment `unpaid` until an admin marks the order `Delivered`. Online methods do not decrement stock until the provider verifies payment.
+
+An invoice (`INV-YYYYMMDD-XXXX`, dated in Asia/Dhaka) is created when an order is confirmed, including when an online payment confirms it, and again on delivery if one is still missing. Orders that were already confirmed, processing, out for delivery, or delivered get an invoice the next time the API starts. The invoice payload includes the store name, logo, phone, email, and address, the customer and delivery address, line items, BDT totals, and the live order and payment status.
+
+## Notifications
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| GET | `/notifications` | user. `meta.unread` is the unread count |
+| POST | `/notifications/read` | user. `{ id }` or `{ all: true }` |
+
+Customers are notified in the app when an order is confirmed, packed (`Processing`), out for delivery, delivered, or cancelled, when an invoice is ready, and when a payment fails. Signed-in customers receive `notification:new` on their socket room. Guests receive the same rows, attached to the account when they later sign in with the checkout phone.
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| GET | `/admin/notices/summary` | admin. `{ total, orders, requests }` unseen counts |
+| GET | `/admin/notices` | admin |
+| POST | `/admin/notices/seen` | admin. `{ ids }` or `{ refType, refId }` or `{ refType, refIds }` |
+
+Admins are notified of new orders, customer cancellations, failed or refunded payments, and contact-form inquiries. Socket room `admins` receives `admin:notices` and `admin:counts`. Opening an order marks that order's notices seen. Opening the inquiries on the settings screen marks those messages seen.
 
 ## Payments
 
@@ -135,6 +155,7 @@ Every `/admin` route requires an admin JWT.
 | GET | `/admin/categories` |
 | GET | `/admin/banners` |
 | GET | `/admin/orders` and `/admin/orders/:id` |
+| GET | `/admin/orders/:id/invoice` |
 | PATCH | `/admin/orders/:id/status` `{ status, note }` |
 | GET | `/admin/customers` and `/admin/customers/:id` |
 | PATCH | `/admin/customers/:id` `{ isActive }` |
@@ -152,4 +173,4 @@ Every `/admin` route requires an admin JWT.
 
 ## Realtime
 
-Socket.io on the same host. Handshake `auth.token` is the access token when the shopper is signed in. Emit `order:watch` with `{ orderId, phone }` after the server checks ownership or the phone on the order. The server emits `order:status` to `order:<id>` and `user:<id>`.
+Socket.io on the same host. Handshake `auth.token` is the access token when the shopper is signed in. Emit `order:watch` with `{ orderId, phone }` after the server checks ownership or the phone on the order. The server emits `order:status` to `order:<id>` and `user:<id>`. Admins also join `admins`. Customer notifications use `notification:new` and `notification:count` on `user:<id>`. Admin alerts use `admin:notices` and `admin:counts` on `admins`.

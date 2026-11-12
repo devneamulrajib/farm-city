@@ -5,8 +5,10 @@ import { StoreLayout } from './components/layout.jsx';
 import {
   AccountOrderPage, AddressesPage, LoginPage, OrdersPage, ProfilePage, RegisterPage,
 } from './pages/AccountPages.jsx';
+import { NotificationsPage } from './components/LiveNotifications.jsx';
+import { AdminInvoicePage, CustomerInvoicePage } from './pages/InvoicePages.jsx';
 import {
-  AdminLayout, CategoriesAdminPage, CustomersAdminPage, DashboardPage, OrderAdminPage,
+  AdminLayout, CategoriesAdminPage, CustomersAdminPage, DashboardPage, InboxPage, OrderAdminPage,
   OrdersAdminPage, ProductFormPage, ProductsAdminPage, PromotionsPage, SettingsAdminPage,
 } from './pages/AdminPages.jsx';
 import { ProductDetailPage, ProductListPage } from './pages/CatalogPages.jsx';
@@ -47,15 +49,19 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="account" element={<Protected><ProfilePage /></Protected>} />
         <Route path="account/orders" element={<Protected><OrdersPage /></Protected>} />
+        <Route path="account/orders/:orderNumber/invoice" element={<Protected><CustomerInvoicePage /></Protected>} />
         <Route path="account/orders/:orderNumber" element={<Protected><AccountOrderPage /></Protected>} />
+        <Route path="account/notifications" element={<Protected><NotificationsPage /></Protected>} />
         <Route path="account/addresses" element={<Protected><AddressesPage /></Protected>} />
       </Route>
+      <Route path="admin/orders/:id/invoice" element={<Protected admin><AdminInvoicePage /></Protected>} />
       <Route path="admin" element={<Protected admin><AdminLayout /></Protected>}>
         <Route index element={<DashboardPage />} />
         <Route path="products" element={<ProductsAdminPage />} />
         <Route path="products/new" element={<ProductFormPage />} />
         <Route path="products/:id" element={<ProductFormPage />} />
         <Route path="categories" element={<CategoriesAdminPage />} />
+        <Route path="inbox" element={<InboxPage />} />
         <Route path="orders" element={<OrdersAdminPage />} />
         <Route path="orders/:id" element={<OrderAdminPage />} />
         <Route path="customers" element={<CustomersAdminPage />} />

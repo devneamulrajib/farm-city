@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import { toast } from 'sonner';
 import { Button, Field, Notice } from '../components/ui/primitives.jsx';
 import { OrderView } from './CheckoutPages.jsx';
+import { getAccessToken } from '../services/api.js';
 import { authApi, orderApi } from '../services/resources.js';
 import { login, logout, register, setUser } from '../store/authSlice.js';
 import { mergeCart } from '../store/cartSlice.js';
@@ -177,7 +179,7 @@ export function OrdersPage() {
           {orders.map((order) => (
             <Link key={order.orderNumber} to={`/account/orders/${order.orderNumber}`} className="flex items-center justify-between py-4">
               <span><span className="font-medium">{order.orderNumber}</span><span className="block text-sm text-ocean-900/60">{dhaka(order.createdAt, i18n.language)}</span></span>
-              <span className="text-right"><span className="block">{money(order.total)}</span><span className="text-sm text-ocean-900/60">{t(`status.${order.status}`)}</span></span>
+              <span className="text-right"><span className="block">{money(order.total)}</span><span className="text-sm text-ocean-900/60">{t(`status.${order.status}`)}{order.invoice ? ` · ${t('invoice.view')}` : ''}</span></span>
             </Link>
           ))}
         </div>
@@ -192,11 +194,20 @@ export function AccountOrderPage() {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState('');
   useEffect(() => { orderApi.mineOne(orderNumber).then((res) => setOrder(res.data)).catch((err) => setError(apiError(err))); }, [orderNumber]);
+  const orderId = order?.id;
+  const orderPhone = order?.customer?.phone;
+  useEffect(() => {
+    if (!orderId) return undefined;
+    const socket = io(import.meta.env.VITE_API_URL || undefined, { auth: { token: getAccessToken() || '' } });
+    socket.emit('order:watch', { orderId, phone: orderPhone });
+    socket.on('order:status', (payload) => setOrder((current) => ({ ...current, ...payload, id: current.id })));
+    return () => socket.disconnect();
+  }, [orderId, orderPhone]);
   async function cancel() {
     try {
       const res = await orderApi.cancel(orderNumber, t('order.cancelled'));
       setOrder(res.data);
     } catch (err) { toast.error(apiError(err)); }
   }
-  return <div className="container-page max-w-3xl py-10">{error ? <Notice>{error}</Notice> : <OrderView order={order} onCancel={cancel} />}</div>;
+  return <div className="container-page max-w-3xl py-10">{error ? <Notice>{error}</Notice> : <OrderView order={order} onCancel={cancel} invoiceHref={order?.invoice ? `/account/orders/${order.orderNumber}/invoice` : ''} />}</div>;
 }

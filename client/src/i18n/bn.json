@@ -49,6 +49,7 @@
     "orders": "অর্ডার",
     "addresses": "ঠিকানা",
     "profile": "প্রোফাইল",
+    "notifications": "নোটিফিকেশন",
     "admin": "অ্যাডমিন"
   },
   "home": {
@@ -204,6 +205,73 @@
     "nagad": "নগদ",
     "sslcommerz": "কার্ড / অনলাইন ব্যাংক"
   },
+  "payStatus": {
+    "unpaid": "অপরিশোধিত",
+    "pending": "অপেক্ষমাণ",
+    "paid": "পরিশোধিত",
+    "failed": "ব্যর্থ",
+    "refunded": "ফেরত"
+  },
+  "invoice": {
+    "title": "ইনভয়েস",
+    "number": "ইনভয়েস নম্বর",
+    "issued": "ইনভয়েসের তারিখ",
+    "orderDate": "অর্ডারের তারিখ",
+    "billTo": "বিল",
+    "deliverTo": "ডেলিভারি",
+    "item": "পণ্য",
+    "qty": "পরিমাণ",
+    "price": "দাম",
+    "amount": "মোট",
+    "subtotal": "উপমোট",
+    "delivery": "ডেলিভারি",
+    "discount": "ছাড়",
+    "total": "সর্বমোট",
+    "payment": "পেমেন্ট",
+    "paymentStatus": "পেমেন্টের অবস্থা",
+    "orderStatus": "অর্ডারের অবস্থা",
+    "currency": "মুদ্রা",
+    "print": "প্রিন্ট",
+    "download": "ডাউনলোড",
+    "thanks": "ফার্ম সিটিতে কেনাকাটার জন্য ধন্যবাদ।",
+    "view": "ইনভয়েস দেখুন",
+    "sku": "এসকেইউ",
+    "backOrder": "অর্ডারে ফিরুন",
+    "unavailable": "এই অর্ডারের ইনভয়েস এখনো তৈরি হয়নি।"
+  },
+  "notify": {
+    "title": "নোটিফিকেশন",
+    "empty": "এখনো কোনো নোটিফিকেশন নেই।",
+    "markAll": "সব পড়া হয়েছে",
+    "all": "সব নোটিফিকেশন",
+    "bell": "নোটিফিকেশন",
+    "order": {
+      "confirmed": "অর্ডার {{orderNumber}} নিশ্চিত হয়েছে।",
+      "processing": "অর্ডার {{orderNumber}} প্যাক করা হয়েছে।",
+      "out": "অর্ডার {{orderNumber}} ডেলিভারির পথে।",
+      "delivered": "অর্ডার {{orderNumber}} পৌঁছে গেছে।",
+      "cancelled": "অর্ডার {{orderNumber}} বাতিল হয়েছে।"
+    },
+    "invoice": {
+      "ready": "অর্ডার {{orderNumber}}-এর ইনভয়েস {{invoiceNumber}} প্রস্তুত।"
+    },
+    "payment": {
+      "failed": "অর্ডার {{orderNumber}}-এর পেমেন্ট সম্পন্ন হয়নি।"
+    }
+  },
+  "notice": {
+    "order": {
+      "new": "{{customerName}} নতুন অর্ডার {{orderNumber}} দিয়েছেন",
+      "cancelled": "অর্ডার {{orderNumber}} বাতিল হয়েছে"
+    },
+    "payment": {
+      "failed": "অর্ডার {{orderNumber}}-এর পেমেন্ট ব্যর্থ",
+      "refunded": "অর্ডার {{orderNumber}}-এর পেমেন্ট ফেরত হয়েছে"
+    },
+    "inquiry": {
+      "new": "{{name}} একটি বার্তা পাঠিয়েছেন"
+    }
+  },
   "admin": {
     "overview": "সারাংশ",
     "products": "পণ্য",
@@ -284,6 +352,8 @@
     "logoClear": "ডিফল্ট লোগো ব্যবহার করুন",
     "inquiries": "বার্তা",
     "subscribers": "নিউজলেটার",
-    "backShop": "দোকান দেখুন"
+    "backShop": "দোকান দেখুন",
+    "inbox": "ইনবক্স",
+    "noNotices": "নতুন কিছু নেই।"
   }
 }

@@ -4,6 +4,7 @@ import { isAllowedOrigin } from '../config/env.js';
 import { verifyAccess } from '../services/tokenService.js';
 import { normalizeBdPhone } from '../utils/phone.js';
 import { setOrderIo } from '../services/orderService.js';
+import { setNotificationIo } from '../services/notificationService.js';
 
 export function attachSocket(server) {
   const io = new Server(server, {
@@ -21,6 +22,7 @@ export function attachSocket(server) {
   });
   io.on('connection', (socket) => {
     if (socket.user?.sub) socket.join(`user:${socket.user.sub}`);
+    if (socket.user?.role === 'admin') socket.join('admins');
     socket.on('order:watch', async ({ orderId, orderNumber, phone } = {}) => {
       try {
         let order = null;
@@ -36,5 +38,6 @@ export function attachSocket(server) {
     });
   });
   setOrderIo(io);
+  setNotificationIo(io);
   return io;
 }

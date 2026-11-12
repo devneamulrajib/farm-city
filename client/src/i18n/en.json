@@ -49,6 +49,7 @@
     "orders": "Orders",
     "addresses": "Addresses",
     "profile": "Profile",
+    "notifications": "Notifications",
     "admin": "Admin"
   },
   "home": {
@@ -210,6 +211,73 @@
     "nagad": "Nagad",
     "sslcommerz": "Card / online banking"
   },
+  "payStatus": {
+    "unpaid": "Unpaid",
+    "pending": "Pending",
+    "paid": "Paid",
+    "failed": "Failed",
+    "refunded": "Refunded"
+  },
+  "invoice": {
+    "title": "Invoice",
+    "number": "Invoice number",
+    "issued": "Invoice date",
+    "orderDate": "Order date",
+    "billTo": "Bill to",
+    "deliverTo": "Deliver to",
+    "item": "Item",
+    "qty": "Qty",
+    "price": "Price",
+    "amount": "Amount",
+    "subtotal": "Subtotal",
+    "delivery": "Delivery",
+    "discount": "Discount",
+    "total": "Total",
+    "payment": "Payment",
+    "paymentStatus": "Payment status",
+    "orderStatus": "Order status",
+    "currency": "Currency",
+    "print": "Print",
+    "download": "Download",
+    "thanks": "Thank you for shopping at Farm City.",
+    "view": "View invoice",
+    "sku": "SKU",
+    "backOrder": "Back to order",
+    "unavailable": "This order does not have an invoice yet."
+  },
+  "notify": {
+    "title": "Notifications",
+    "empty": "No notifications yet.",
+    "markAll": "Mark all read",
+    "all": "All notifications",
+    "bell": "Notifications",
+    "order": {
+      "confirmed": "Order {{orderNumber}} is confirmed.",
+      "processing": "Order {{orderNumber}} is packed.",
+      "out": "Order {{orderNumber}} is out for delivery.",
+      "delivered": "Order {{orderNumber}} has been delivered.",
+      "cancelled": "Order {{orderNumber}} was cancelled."
+    },
+    "invoice": {
+      "ready": "Invoice {{invoiceNumber}} is ready for order {{orderNumber}}."
+    },
+    "payment": {
+      "failed": "Payment for order {{orderNumber}} did not go through."
+    }
+  },
+  "notice": {
+    "order": {
+      "new": "New order {{orderNumber}} from {{customerName}}",
+      "cancelled": "Order {{orderNumber}} was cancelled"
+    },
+    "payment": {
+      "failed": "Payment failed for order {{orderNumber}}",
+      "refunded": "Payment refunded for order {{orderNumber}}"
+    },
+    "inquiry": {
+      "new": "New message from {{name}}"
+    }
+  },
   "admin": {
     "overview": "Overview",
     "products": "Products",
@@ -290,6 +358,8 @@
     "logoClear": "Use the default logo",
     "inquiries": "Messages",
     "subscribers": "Newsletter",
-    "backShop": "View shop"
+    "backShop": "View shop",
+    "inbox": "Inbox",
+    "noNotices": "Nothing new."
   }
 }
